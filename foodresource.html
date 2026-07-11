@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>세계 식량 자원 퀴즈 — 곡물 사일로 챌린지</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700;900&family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0F2E28;
+    --bg-alt: #143A32;
+    --panel: #17423A;
+    --wheat: #E8A93A;
+    --wheat-light: #F4C766;
+    --sky: #5AA9C9;
+    --cream: #F5EFD8;
+    --cream-dim: #CFC6A6;
+    --rice: #7FB069;
+    --danger: #C1443B;
+    --line: rgba(245,239,216,0.14);
+    --radius: 14px;
+    --serif: 'Noto Serif KR', serif;
+    --sans: 'Noto Sans KR', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% 10%, rgba(90,169,201,0.10), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(232,169,58,0.10), transparent 45%),
+      var(--bg);
+    color:var(--cream);
+    font-family:var(--sans);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px 16px;
+    overflow-x:hidden;
+  }
+  .routes{
+    position:fixed; inset:0; pointer-events:none; opacity:0.35; z-index:0;
+  }
+  .stage{
+    position:relative; z-index:1;
+    width:100%; max-width:640px;
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:0 20px 60px rgba(0,0,0,0.35);
+    padding:32px 28px;
+    position:relative;
+    overflow:hidden;
+  }
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:0.14em;
+    color:var(--wheat-light);
+    text-transform:uppercase;
+    margin-bottom:10px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .eyebrow::before{content:'';width:18px;height:2px;background:var(--wheat);display:inline-block;}
+  h1{
+    font-family:var(--serif);
+    font-weight:900;
+    font-size:clamp(26px,5vw,36px);
+    line-height:1.25;
+    margin:0 0 8px;
+    color:var(--cream);
+  }
+  .sub{color:var(--cream-dim); font-size:14.5px; line-height:1.6; margin:0 0 26px;}
+  /* Silo signature element */
+  .silo-wrap{display:flex; align-items:center; gap:18px; margin-bottom:26px;}
+  .silo{width:56px; height:88px; flex-shrink:0;}
+  .silo-track{fill:none; stroke:rgba(245,239,216,0.18); stroke-width:2;}
+  .silo-fill{fill:var(--wheat); transition:transform 0.6s cubic-bezier(.4,0,.2,1); transform-origin:bottom;}
+  .silo-cap{fill:var(--bg-alt); stroke:rgba(245,239,216,0.25); stroke-width:1.5;}
+  .name-field{
+    width:100%; padding:14px 16px; border-radius:10px; border:1.5px solid var(--line);
+    background:var(--bg-alt); color:var(--cream); font-family:var(--sans); font-size:16px;
+    margin-bottom:16px; outline:none;
+  }
+  .name-field:focus{border-color:var(--wheat);}
+  .session-label{font-family:var(--mono); font-size:12px; letter-spacing:0.08em; color:var(--cream-dim); text-transform:uppercase; margin-bottom:10px;}
+  .session-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:20px;}
+  .session-btn{
+    font-family:var(--serif); font-weight:700; font-size:18px;
+    border:1.5px solid var(--line); background:var(--bg-alt); color:var(--cream-dim);
+    border-radius:10px; padding:14px 0; cursor:pointer; transition:all .15s ease;
+  }
+  .session-btn:hover{border-color:var(--wheat-light);}
+  .session-btn.active{background:rgba(232,169,58,0.16); border-color:var(--wheat); color:var(--wheat-light);}
+  .session-hint{font-size:12px; color:var(--danger); min-height:16px; margin:-10px 0 14px; display:none;}
+  .session-hint.show{display:block;}
+  .btn{
+    font-family:var(--sans); font-weight:700; font-size:16px;
+    border:none; border-radius:10px; padding:15px 22px;
+    background:var(--wheat); color:#20140A; cursor:pointer;
+    width:100%; letter-spacing:0.01em;
+    transition:transform .15s ease, background .15s ease;
+  }
+  .btn:hover{background:var(--wheat-light); transform:translateY(-1px);}
+  .btn:active{transform:translateY(0);}
+  .btn-ghost{
+    background:transparent; border:1.5px solid var(--line); color:var(--cream);
+  }
+  .btn-ghost:hover{border-color:var(--wheat); background:transparent;}
+  .meta-row{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-family:var(--mono); font-size:12.5px; color:var(--cream-dim);}
+  .progress-outer{height:8px; background:var(--bg-alt); border-radius:6px; overflow:hidden; margin-bottom:22px; border:1px solid var(--line);}
+  .progress-inner{height:100%; background:linear-gradient(90deg, var(--rice), var(--wheat)); width:0%; transition:width .4s ease;}
+  .top-row{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px;}
+  .timer{
+    width:46px; height:46px; position:relative; flex-shrink:0;
+  }
+  .timer svg{transform:rotate(-90deg);}
+  .timer circle{fill:none; stroke-width:4;}
+  .timer .t-bg{stroke:rgba(245,239,216,0.15);}
+  .timer .t-fg{stroke:var(--sky); stroke-linecap:round; transition:stroke-dashoffset 1s linear, stroke .3s ease;}
+  .timer .t-num{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-weight:700; font-size:14px; color:var(--cream);
+  }
+  .cat-tag{
+    display:inline-block; font-family:var(--mono); font-size:11px; letter-spacing:0.08em;
+    color:var(--bg); background:var(--sky); padding:3px 9px; border-radius:20px; margin-bottom:12px;
+  }
+  .qtext{font-family:var(--serif); font-weight:700; font-size:clamp(18px,3.6vw,22px); line-height:1.42; margin:0 0 16px;}
+  .visual{
+    background:var(--bg-alt); border:1px solid var(--line); border-radius:10px;
+    padding:14px; margin-bottom:18px; display:flex; justify-content:center;
+  }
+  .visual svg{width:100%; height:auto; max-width:100%;}
+  .options{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  @media (max-width:480px){ .options{grid-template-columns:1fr;} }
+  .opt{
+    text-align:left; font-family:var(--sans); font-size:15px; font-weight:500;
+    border:1.5px solid var(--line); background:var(--bg-alt); color:var(--cream);
+    border-radius:10px; padding:14px 16px; cursor:pointer; transition:all .15s ease;
+    display:flex; align-items:center; gap:10px;
+  }
+  .opt .k{
+    font-family:var(--mono); font-weight:700; font-size:12px; color:var(--cream-dim);
+    border:1px solid var(--line); border-radius:6px; width:22px; height:22px;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .opt:hover:not(:disabled){border-color:var(--wheat); transform:translateY(-1px);}
+  .opt:disabled{cursor:default;}
+  .opt.correct{background:rgba(127,176,105,0.22); border-color:var(--rice);}
+  .opt.correct .k{background:var(--rice); color:var(--bg); border-color:var(--rice);}
+  .opt.wrong{background:rgba(193,68,59,0.22); border-color:var(--danger);}
+  .opt.wrong .k{background:var(--danger); color:var(--cream); border-color:var(--danger);}
+  .explain{
+    margin-top:16px; padding:14px 16px; border-radius:10px; background:var(--bg-alt);
+    border-left:3px solid var(--wheat); font-size:14px; line-height:1.6; color:var(--cream-dim);
+    display:none;
+  }
+  .explain.show{display:block;}
+  .next-btn{margin-top:18px; display:none;}
+  .next-btn.show{display:block;}
+  .score-pill{
+    font-family:var(--mono); font-weight:700; font-size:13px; color:var(--wheat-light);
+    background:rgba(232,169,58,0.12); border:1px solid rgba(232,169,58,0.35);
+    padding:5px 12px; border-radius:20px;
+  }
+  /* Result screen */
+  .result-grade{
+    font-family:var(--serif); font-weight:900; font-size:52px; color:var(--wheat);
+    margin:8px 0 4px;
+  }
+  .result-score{font-family:var(--mono); font-size:15px; color:var(--cream-dim); margin-bottom:22px;}
+  .breakdown{display:flex; flex-direction:column; gap:10px; margin-bottom:24px;}
+  .b-row{display:flex; align-items:center; gap:10px; font-size:13.5px;}
+  .b-label{width:96px; flex-shrink:0; color:var(--cream-dim); font-family:var(--mono); font-size:12px;}
+  .b-bar{flex:1; height:8px; background:var(--bg-alt); border-radius:6px; overflow:hidden; border:1px solid var(--line);}
+  .b-fill{height:100%; background:var(--rice);}
+  .b-val{width:38px; text-align:right; font-family:var(--mono); font-size:12px; color:var(--cream-dim);}
+  .hidden{display:none !important;}
+  .foot-note{margin-top:18px; text-align:center; font-size:12px; color:var(--cream-dim); opacity:0.7;}
+  .lb-title{font-family:var(--mono); font-size:12px; letter-spacing:0.1em; color:var(--wheat-light); text-transform:uppercase; margin:22px 0 10px; display:flex; align-items:center; gap:8px;}
+  .lb-title::before{content:'';width:14px;height:2px;background:var(--wheat);display:inline-block;}
+  .lb-list{display:flex; flex-direction:column; gap:8px; margin-bottom:20px;}
+  .lb-row{display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:10px; background:var(--bg-alt); border:1px solid var(--line);}
+  .lb-row.me{border-color:var(--wheat); background:rgba(232,169,58,0.10);}
+  .lb-rank{font-family:var(--mono); font-weight:700; font-size:14px; width:22px; color:var(--wheat-light);}
+  .lb-name{flex:1; font-size:14px; font-weight:500;}
+  .lb-time{font-family:var(--mono); font-size:11px; color:var(--cream-dim);}
+  .lb-score{font-family:var(--mono); font-weight:700; font-size:14px; color:var(--cream);}
+  .lb-status{font-size:12.5px; color:var(--cream-dim); margin-bottom:10px;}
+</style>
+</head>
+<body>
+
+<svg class="routes" viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice">
+  <path d="M 40 620 Q 250 500 420 560 T 760 480" stroke="#5AA9C9" stroke-width="1.4" fill="none"/>
+  <path d="M 100 120 Q 300 220 380 160 T 700 260" stroke="#E8A93A" stroke-width="1.4" fill="none"/>
+  <path d="M 60 380 Q 260 340 400 400 T 750 350" stroke="#7FB069" stroke-width="1" fill="none"/>
+</svg>
+
+<div class="stage">
+
+  <!-- START SCREEN -->
+  <div class="card" id="screen-start">
+    <div class="eyebrow">세계시민과 지리 · 식량 자원의 생산과 소비</div>
+    <div class="silo-wrap">
+      <svg class="silo" viewBox="0 0 56 88">
+        <rect class="silo-cap" x="4" y="2" width="48" height="14" rx="7"/>
+        <rect class="silo-track" x="8" y="16" width="40" height="66" rx="6"/>
+        <clipPath id="clipStart"><rect x="8" y="16" width="40" height="66" rx="6"/></clipPath>
+        <rect class="silo-fill" x="8" y="16" width="40" height="66" clip-path="url(#clipStart)" style="transform:scaleY(0)"/>
+      </svg>
+      <div>
+        <h1 style="margin-bottom:2px;">곡물 사일로 챌린지</h1>
+        <div class="sub" style="margin-bottom:0;">정답을 맞힐 때마다 사일로가 곡물로 채워져요</div>
+      </div>
+    </div>
+    <p class="sub">쌀·밀·옥수수의 생산 지역, 소·양·돼지 육류 자원의 사육과 소비, 곡물 메이저와 식량 안보까지 —
+    수업 시간에 다룬 핵심 내용만 골라 총 12문항, 문제당 20초로 구성했어요.</p>
+    <div class="session-label">현재 몇 타임 수업인가요?</div>
+    <div class="session-grid" id="sessionGrid">
+      <button class="session-btn" data-session="A">A</button>
+      <button class="session-btn" data-session="B">B</button>
+      <button class="session-btn" data-session="C">C</button>
+      <button class="session-btn" data-session="D">D</button>
+    </div>
+    <div class="session-hint" id="sessionHint">타임을 먼저 선택해주세요</div>
+    <input type="text" class="name-field" id="playerName" placeholder="이름(실명)을 입력하세요" maxlength="12">
+    <button class="btn" id="startBtn">게임 시작 →</button>
+  </div>
+
+  <!-- QUIZ SCREEN -->
+  <div class="card hidden" id="screen-quiz">
+    <div class="top-row">
+      <svg class="silo" viewBox="0 0 56 88" style="width:34px;height:54px;">
+        <rect class="silo-cap" x="4" y="2" width="48" height="14" rx="7"/>
+        <rect class="silo-track" x="8" y="16" width="40" height="66" rx="6"/>
+        <clipPath id="clipQuiz"><rect x="8" y="16" width="40" height="66" rx="6"/></clipPath>
+        <rect class="silo-fill" id="siloFillQuiz" x="8" y="16" width="40" height="66" clip-path="url(#clipQuiz)" style="transform:scaleY(0)"/>
+      </svg>
+      <div style="flex:1;">
+        <div class="meta-row"><span id="qCounter">문제 1 / 16</span><span class="score-pill" id="scorePill">0점</span></div>
+        <div class="progress-outer"><div class="progress-inner" id="progressBar"></div></div>
+      </div>
+      <div class="timer">
+        <svg width="46" height="46" viewBox="0 0 46 46">
+          <circle class="t-bg" cx="23" cy="23" r="19"></circle>
+          <circle class="t-fg" id="timerCircle" cx="23" cy="23" r="19" stroke-dasharray="119.4" stroke-dashoffset="0"></circle>
+        </svg>
+        <div class="t-num" id="timerNum">20</div>
+      </div>
+    </div>
+
+    <span class="cat-tag" id="catTag">곡물 자원</span>
+    <p class="qtext" id="qText">문제 텍스트</p>
+    <div class="visual hidden" id="visualBox"></div>
+    <div class="options" id="optionsBox"></div>
+    <div class="explain" id="explainBox"></div>
+    <button class="btn next-btn" id="nextBtn">다음 문제 →</button>
+  </div>
+
+  <!-- RESULT SCREEN -->
+  <div class="card hidden" id="screen-result">
+    <div class="eyebrow">최종 결과</div>
+    <svg class="silo" viewBox="0 0 56 88" style="width:64px;height:100px;margin-bottom:14px;">
+      <rect class="silo-cap" x="4" y="2" width="48" height="14" rx="7"/>
+      <rect class="silo-track" x="8" y="16" width="40" height="66" rx="6"/>
+      <clipPath id="clipResult"><rect x="8" y="16" width="40" height="66" rx="6"/></clipPath>
+      <rect class="silo-fill" id="siloFillResult" x="8" y="16" width="40" height="66" clip-path="url(#clipResult)" style="transform:scaleY(0)"/>
+    </svg>
+    <div class="result-grade" id="resultGrade">-</div>
+    <div class="result-score" id="resultScore">0점</div>
+    <div class="breakdown" id="breakdownBox"></div>
+
+    <div class="lb-title"><span id="lbClassTitleText">이번 타임 TOP 5</span></div>
+    <div class="lb-status" id="lbClassStatus">순위판을 불러오는 중...</div>
+    <div class="lb-list" id="lbClassList"></div>
+
+    <div class="lb-title">전체 4개 타임 누적 · TOP 10</div>
+    <div class="lb-status" id="lbOverallStatus">순위판을 불러오는 중...</div>
+    <div class="lb-list" id="lbOverallList"></div>
+
+    <button class="btn" id="restartBtn">다시 도전하기</button>
+  </div>
+
+</div>
+
+<script>
+/* ---------------- DATA ---------------- */
+const QUESTIONS = [
+{
+  category:"곡물 자원", type:"text",
+  q:"다음 중 곡물과 그 곡물의 세계 최대 생산 지역(대륙) 연결이 옳지 않은 것은?",
+  options:["쌀 — 아시아","밀 — 아시아·유럽","옥수수 — 아메리카·아시아","옥수수 — 아프리카·오세아니아"], answer:3,
+  explain:"쌀은 아시아, 밀은 아시아와 유럽, 옥수수는 아메리카와 아시아에서 특히 많이 생산돼. 아프리카·오세아니아는 세 곡물 중 어느 것의 주요 생산 지역으로도 꼽히지 않아."
+},
+{
+  category:"곡물 자원", type:"text",
+  q:"세 곡물(쌀, 밀, 옥수수) 중 세계 총생산량이 가장 많은 것은?",
+  options:["쌀","밀","옥수수","세 곡물의 생산량은 비슷한 수준이다"], answer:2,
+  explain:"곡물 자원 중 총생산량은 옥수수가 가장 많아."
+},
+{
+  category:"곡물 자원", type:"text",
+  q:"쌀, 밀, 옥수수의 재배 면적을 비교한 설명으로 옳은 것은?",
+  options:["쌀의 재배 면적이 세 곡물 중 가장 넓다","밀과 옥수수의 재배 면적이 쌀보다 넓다","세 곡물의 재배 면적은 거의 차이가 없다","옥수수의 재배 면적이 세 곡물 중 가장 좁다"], answer:1,
+  explain:"재배 면적은 밀과 옥수수가 쌀보다 넓어. 다만 총생산량이 가장 많은 곡물은 옥수수야."
+},
+{
+  category:"육류 자원", type:"text",
+  q:"소를 사육하기 시작한 본래 목적으로 가장 적절한 것은?",
+  options:["처음부터 육류 소비를 위해 사육했다","노동력과 우유 같은 유제품을 얻기 위해 사육했다","가죽을 얻기 위한 목적만으로 사육했다","종교 의식에 쓰기 위해 사육했다"], answer:1,
+  explain:"소는 원래 노동력과 우유·치즈·버터 같은 유제품을 얻으려고 사육되기 시작했고, 이후 소득 수준이 오르면서 육류 소비가 함께 늘어난 거야."
+},
+{
+  category:"육류 자원", type:"text",
+  q:"양털 수요가 증가하면서 양이 새롭게 인정받게 된 가치는?",
+  options:["모직 공업의 원료","유제품 생산의 주원료","바이오 연료 원료","제지 산업의 원료"], answer:0,
+  explain:"양은 원래 육류와 젖을 얻기 위해 사육됐지만, 양털 수요가 늘면서 모직 공업 원료로서의 가치도 함께 높아졌어."
+},
+{
+  category:"육류 자원", type:"text",
+  q:"오스트레일리아의 양 사육 방식에 대한 설명으로 옳은 것은?",
+  options:["대규모로 방목하며, 건조한 내륙 지역에서는 찬정의 지하수를 이용하기도 한다","좁은 실내 축사에서 밀집 사육만 한다","해안 지역에서만 소규모로 사육한다","양 대신 대부분 돼지를 사육한다"], answer:0,
+  explain:"오스트레일리아는 양을 대규모로 방목하고, 건조한 내륙 지역에서는 찬정(지하수가 솟아오르도록 뚫은 우물)을 이용해 물을 공급하기도 해."
+},
+{
+  category:"육류 자원", type:"text",
+  q:"이슬람교 신자 비율이 높은 서남아시아·북부 아프리카에서 돼지 사육이 매우 드문 이유는?",
+  options:["돼지고기를 금기시하는 종교적 이유 때문","기후가 너무 더워 돼지가 살 수 없기 때문","돼지 사료를 구하기 어렵기 때문","법으로 사육을 전면 금지했기 때문"], answer:0,
+  explain:"돼지고기를 금기시하는 이슬람교 신자 비율이 높은 서남아시아와 북부 아프리카에서는 돼지가 거의 사육되지 않아."
+},
+{
+  category:"육류 자원", type:"text",
+  q:"돼지고기 생산과 소비에서 가장 큰 비중을 차지하는 나라는 어디일까?",
+  options:["중국","미국","브라질","러시아"], answer:0,
+  explain:"돼지고기의 절반 정도는 중국에서 생산 및 소비되고 있어."
+},
+{
+  category:"육류 자원", type:"text",
+  q:"양고기 생산 비율을 대륙별로 봤을 때, 가장 큰 비중을 차지하는 곳은?",
+  options:["아시아","유럽","아프리카","라틴 아메리카"], answer:0,
+  explain:"양고기 총생산량 중 아시아가 약 61%를 차지해 가장 큰 비중을 보여."
+},
+{
+  category:"곡물 시장과 식량 안보", type:"text",
+  q:"'곡물 메이저'라 불리는 소수의 곡물 기업들에 대한 설명으로 옳은 것은?",
+  options:["세계 곡물 시장 유통량의 70~90%가량을 차지하며 가격에 큰 영향력을 행사한다","대부분 각국 정부가 소유한 공기업이다","곡물 가격을 낮추기 위해 서로 치열하게 경쟁만 한다","농업 취약국의 식량 자급을 적극적으로 지원한다"], answer:0,
+  explain:"곡물 메이저로 불리는 소수의 기업들은 세계 곡물 시장의 70~90%가량을 장악하고 있어서, 공급과 가격을 좌우할 만큼 영향력이 커."
+},
+{
+  category:"곡물 시장과 식량 안보", type:"text",
+  q:"주요 곡물 기업들이 곡물 엘리베이터 같은 대형 시설과 인공위성 정보를 활용해 강화해 나가고 있는 것은?",
+  options:["독점적인 유통 구조","국제기구의 감시 체계","지역 농민들의 협동조합","공정 가격 신고 제도"], answer:0,
+  explain:"곡물 기업들은 대규모 인프라와 첨단 정보를 통해 시장에서 독점적인 유통 구조를 강화해 나가고 있어."
+},
+{
+  category:"곡물 시장과 식량 안보", type:"text",
+  q:"세계 여러 국가가 농업 생산성을 높이기 위해 추진하는 기술적 발전으로 언급된 것은?",
+  options:["농작물 유전자 개량과 스마트 팜 사업 육성","전통 농법으로의 전면 회귀","농지 면적의 전면 축소","곡물 수출의 전면 금지"], answer:0,
+  explain:"세계 여러 국가는 농작물에 대한 유전자 개량, 스마트 팜(정보 기술을 이용해 조성한 지능화된 농장) 사업 육성 같은 기술적 발전을 추진하고 있어."
+}
+];
+
+
+/* ---------------- LEADERBOARD CONFIG ----------------
+   1) 구글 시트 + Apps Script를 배포한 뒤, 아래 APPS_SCRIPT_URL에
+      "https://script.google.com/macros/s/xxxxx/exec" 형태의 웹 앱 URL을 붙여넣으세요.
+   2) TOP_CLASS / TOP_OVERALL 숫자만 바꾸면 순위판 인원수를 조절할 수 있어요.
+------------------------------------------------------ */
+const APPS_SCRIPT_URL = ""; // 여기에 배포한 웹 앱 URL을 넣어주세요
+const TOP_CLASS = 5;
+const TOP_OVERALL = 10;
+
+async function submitScore(name, session, score){
+  if(!APPS_SCRIPT_URL) return;
+  try{
+    await fetch(APPS_SCRIPT_URL, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'}, // Apps Script CORS 우회를 위해 text/plain 사용
+      body: JSON.stringify({name, session, score})
+    });
+  }catch(err){
+    console.warn('점수 전송 실패:', err);
+  }
+}
+
+function renderLbList(listEl, rows, meMatcher){
+  listEl.innerHTML = rows.map((r,i)=>{
+    const isMe = meMatcher(r);
+    return `<div class="lb-row ${isMe?'me':''}">
+      <span class="lb-rank">${i+1}</span>
+      <span class="lb-name">${escapeHtml(r.name)}${r.session?` <span style="opacity:.55">· ${escapeHtml(r.session)}타임</span>`:''}</span>
+      <span class="lb-time">${r.time||''}</span>
+      <span class="lb-score">${r.score}점</span>
+    </div>`;
+  }).join('');
+}
+
+async function loadLeaderboard(){
+  const classStatusEl = el('lbClassStatus');
+  const classListEl = el('lbClassList');
+  const overallStatusEl = el('lbOverallStatus');
+  const overallListEl = el('lbOverallList');
+  el('lbClassTitleText').textContent = `${selectedSession}타임 TOP ${TOP_CLASS}`;
+
+  if(!APPS_SCRIPT_URL){
+    classStatusEl.textContent = '순위판이 아직 연결되지 않았어요. (선생님: APPS_SCRIPT_URL을 설정해주세요)';
+    overallStatusEl.textContent = '';
+    classListEl.innerHTML=''; overallListEl.innerHTML='';
+    return;
+  }
+  try{
+    const res = await fetch(`${APPS_SCRIPT_URL}?session=${encodeURIComponent(selectedSession)}&topClass=${TOP_CLASS}&topOverall=${TOP_OVERALL}`);
+    const data = await res.json();
+    const classTop = data.classTop || [];
+    const overallTop = data.overallTop || [];
+
+    if(classTop.length===0){
+      classStatusEl.textContent = `${selectedSession}타임의 첫 번째 기록이에요!`;
+      classListEl.innerHTML='';
+    }else{
+      classStatusEl.textContent = `${selectedSession}타임 상위 ${classTop.length}명의 기록이에요`;
+      renderLbList(classListEl, classTop, r=>r.name===playerName && r.score===score && r.session===selectedSession);
+    }
+
+    if(overallTop.length===0){
+      overallStatusEl.textContent = '아직 누적 기록이 없어요.';
+      overallListEl.innerHTML='';
+    }else{
+      overallStatusEl.textContent = `4개 타임을 합친 전체 상위 ${overallTop.length}명이에요`;
+      renderLbList(overallListEl, overallTop, r=>r.name===playerName && r.score===score && r.session===selectedSession);
+    }
+  }catch(err){
+    classStatusEl.textContent = '순위판을 불러오지 못했어요. 네트워크 상태를 확인해주세요.';
+    overallStatusEl.textContent = '';
+    classListEl.innerHTML=''; overallListEl.innerHTML='';
+    console.warn(err);
+  }
+}
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* ---------------- GAME STATE ---------------- */
+let idx=0, score=0, streak=0, timeLeft=20, timerInt=null;
+let categoryStats={};
+let playerName="";
+let selectedSession=null;
+
+const el = id=>document.getElementById(id);
+const screenStart=el('screen-start'), screenQuiz=el('screen-quiz'), screenResult=el('screen-result');
+
+document.querySelectorAll('.session-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    selectedSession = btn.dataset.session;
+    document.querySelectorAll('.session-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    el('sessionHint').classList.remove('show');
+  });
+});
+
+el('startBtn').addEventListener('click', ()=>{
+  if(!selectedSession){
+    el('sessionHint').classList.add('show');
+    return;
+  }
+  playerName = el('playerName').value.trim() || "학생";
+  idx=0; score=0; streak=0; categoryStats={};
+  QUESTIONS.forEach(q=>{ categoryStats[q.category] = categoryStats[q.category] || {correct:0,total:0}; });
+  screenStart.classList.add('hidden');
+  screenQuiz.classList.remove('hidden');
+  loadQuestion();
+});
+
+el('restartBtn').addEventListener('click', ()=>{
+  screenResult.classList.add('hidden');
+  screenStart.classList.remove('hidden');
+  el('playerName').value='';
+});
+
+function setSiloScale(elm, ratio){
+  if(!elm) return;
+  elm.style.transform = `scaleY(${Math.min(1,Math.max(0,ratio))})`;
+}
+
+function loadQuestion(){
+  clearInterval(timerInt);
+  const q = QUESTIONS[idx];
+  el('qCounter').textContent = `문제 ${idx+1} / ${QUESTIONS.length}`;
+  el('scorePill').textContent = `${score}점`;
+  el('catTag').textContent = q.category;
+  el('qText').textContent = q.q;
+  el('progressBar').style.width = `${(idx/QUESTIONS.length)*100}%`;
+  setSiloScale(el('siloFillQuiz'), idx/QUESTIONS.length);
+
+  const vbox = el('visualBox');
+  if(q.type==='chart' && q.visual){
+    vbox.innerHTML = q.visual;
+    vbox.classList.remove('hidden');
+  } else {
+    vbox.innerHTML='';
+    vbox.classList.add('hidden');
+  }
+
+  const opts = el('optionsBox');
+  opts.innerHTML='';
+  const letters=['A','B','C','D'];
+  q.options.forEach((opt,i)=>{
+    const b=document.createElement('button');
+    b.className='opt';
+    b.innerHTML = `<span class="k">${letters[i]}</span><span>${opt}</span>`;
+    b.addEventListener('click', ()=>selectAnswer(i));
+    opts.appendChild(b);
+  });
+
+  el('explainBox').classList.remove('show');
+  el('explainBox').textContent='';
+  el('nextBtn').classList.remove('show');
+
+  timeLeft=20;
+  el('timerNum').textContent=timeLeft;
+  const circle=el('timerCircle');
+  circle.style.stroke='var(--sky)';
+  circle.style.strokeDashoffset=0;
+  timerInt=setInterval(()=>{
+    timeLeft--;
+    el('timerNum').textContent=Math.max(timeLeft,0);
+    const offset = 119.4 * (1-(timeLeft/20));
+    circle.style.strokeDashoffset = offset;
+    if(timeLeft<=5) circle.style.stroke='var(--danger)';
+    if(timeLeft<=0){
+      clearInterval(timerInt);
+      selectAnswer(-1);
+    }
+  },1000);
+}
+
+function selectAnswer(choice){
+  clearInterval(timerInt);
+  const q = QUESTIONS[idx];
+  const buttons = document.querySelectorAll('#optionsBox .opt');
+  buttons.forEach(b=>b.disabled=true);
+
+  const correct = choice===q.answer;
+  categoryStats[q.category].total++;
+  if(correct) categoryStats[q.category].correct++;
+
+  if(choice>=0) buttons[choice].classList.add(correct?'correct':'wrong');
+  if(!correct) buttons[q.answer].classList.add('correct');
+
+  if(correct){
+    streak++;
+    const base=100, timeBonus=Math.max(0,timeLeft)*5, streakBonus = streak>=3 ? 50 : 0;
+    score += base+timeBonus+streakBonus;
+  } else {
+    streak=0;
+  }
+  el('scorePill').textContent = `${score}점`;
+
+  const explain = el('explainBox');
+  explain.textContent = q.explain;
+  explain.classList.add('show');
+  el('nextBtn').classList.add('show');
+}
+
+el('nextBtn').addEventListener('click', ()=>{
+  idx++;
+  if(idx>=QUESTIONS.length){
+    showResult();
+  } else {
+    loadQuestion();
+  }
+});
+
+function showResult(){
+  screenQuiz.classList.add('hidden');
+  screenResult.classList.remove('hidden');
+  el('progressBar').style.width='100%';
+  setSiloScale(el('siloFillResult'),1);
+
+  const maxScore = QUESTIONS.length*(100+100+50);
+  const pct = score/maxScore;
+  let grade='새싹 농부', gradeSub='';
+  if(pct>=0.85){grade='곡물 메이저 등급';}
+  else if(pct>=0.65){grade='숙련된 경작자';}
+  else if(pct>=0.4){grade='성장하는 농부';}
+  el('resultGrade').textContent = grade;
+  el('resultScore').textContent = `${playerName}님 · 총 ${score}점`;
+
+  submitScore(playerName, selectedSession, score);
+  loadLeaderboard();
+
+  const box = el('breakdownBox');
+  box.innerHTML='';
+  Object.entries(categoryStats).forEach(([cat,s])=>{
+    const ratio = s.total? (s.correct/s.total*100):0;
+    const row=document.createElement('div');
+    row.className='b-row';
+    row.innerHTML = `<div class="b-label">${cat}</div>
+      <div class="b-bar"><div class="b-fill" style="width:${ratio}%"></div></div>
+      <div class="b-val">${s.correct}/${s.total}</div>`;
+    box.appendChild(row);
+  });
+}
+</script>
+</body>
+</html>
