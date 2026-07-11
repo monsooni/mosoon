@@ -243,7 +243,7 @@
         <rect class="silo-fill" id="siloFillQuiz" x="8" y="16" width="40" height="66" clip-path="url(#clipQuiz)" style="transform:scaleY(0)"/>
       </svg>
       <div style="flex:1;">
-        <div class="meta-row"><span id="qCounter">문제 1 / 16</span><span class="score-pill" id="scorePill">0점</span></div>
+        <div class="meta-row"><span id="qCounter">문제 1 / 12</span><span class="score-pill" id="scorePill">0점</span></div>
         <div class="progress-outer"><div class="progress-inner" id="progressBar"></div></div>
       </div>
       <div class="timer">
@@ -389,14 +389,14 @@ async function submitScore(name, session, score){
   }
 }
 
-function renderLbList(listEl, rows, meMatcher){
+function renderLbList(listEl, rows){
   listEl.innerHTML = rows.map((r,i)=>{
-    const isMe = meMatcher(r);
+    const isMe = Boolean(r.isMe);
     return `<div class="lb-row ${isMe?'me':''}">
       <span class="lb-rank">${i+1}</span>
       <span class="lb-name">${escapeHtml(r.name)}${r.session?` <span style="opacity:.55">· ${escapeHtml(r.session)}타임</span>`:''}</span>
-      <span class="lb-time">${r.time||''}</span>
-      <span class="lb-score">${r.score}점</span>
+      <span class="lb-time">${escapeHtml(r.time||'')}</span>
+      <span class="lb-score">${Number(r.score)||0}점</span>
     </div>`;
   }).join('');
 }
@@ -415,7 +415,14 @@ async function loadLeaderboard(){
     return;
   }
   try{
-    const res = await fetch(`${APPS_SCRIPT_URL}?session=${encodeURIComponent(selectedSession)}&topClass=${TOP_CLASS}&topOverall=${TOP_OVERALL}`);
+    const params = new URLSearchParams({
+      session: selectedSession,
+      topClass: String(TOP_CLASS),
+      topOverall: String(TOP_OVERALL),
+      name: playerName,
+      score: String(score)
+    });
+    const res = await fetch(`${APPS_SCRIPT_URL}?${params.toString()}`);
     const data = await res.json();
     const classTop = data.classTop || [];
     const overallTop = data.overallTop || [];
@@ -425,7 +432,7 @@ async function loadLeaderboard(){
       classListEl.innerHTML='';
     }else{
       classStatusEl.textContent = `${selectedSession}타임 상위 ${classTop.length}명의 기록이에요`;
-      renderLbList(classListEl, classTop, r=>r.name===playerName && r.score===score && r.session===selectedSession);
+      renderLbList(classListEl, classTop);
     }
 
     if(overallTop.length===0){
@@ -433,7 +440,7 @@ async function loadLeaderboard(){
       overallListEl.innerHTML='';
     }else{
       overallStatusEl.textContent = `4개 타임을 합친 전체 상위 ${overallTop.length}명이에요`;
-      renderLbList(overallListEl, overallTop, r=>r.name===playerName && r.score===score && r.session===selectedSession);
+      renderLbList(overallListEl, overallTop);
     }
   }catch(err){
     classStatusEl.textContent = '순위판을 불러오지 못했어요. 네트워크 상태를 확인해주세요.';
@@ -447,8 +454,34 @@ function escapeHtml(str){
   return String(str).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
+/* ---------------- QUESTION PREPARATION ---------------- */
+function shuffleQuestionOptions(question){
+  const choices = question.options.map((text, originalIndex)=>({
+    text,
+    isAnswer: originalIndex === question.answer
+  }));
+
+  for(let i=choices.length-1; i>0; i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [choices[i], choices[j]] = [choices[j], choices[i]];
+  }
+
+  return {
+    ...question,
+    options: choices.map(choice=>choice.text),
+    answer: choices.findIndex(choice=>choice.isAnswer)
+  };
+}
+
+function getMaxPossibleScore(questionCount){
+  const baseAndTime = questionCount * (100 + 20*5);
+  const maxStreakBonus = Math.max(0, questionCount-2) * 50;
+  return baseAndTime + maxStreakBonus;
+}
+
 /* ---------------- GAME STATE ---------------- */
 let idx=0, score=0, streak=0, timeLeft=20, timerInt=null;
+let activeQuestions=[];
 let categoryStats={};
 let playerName="";
 let selectedSession=null;
@@ -472,7 +505,8 @@ el('startBtn').addEventListener('click', ()=>{
   }
   playerName = el('playerName').value.trim() || "학생";
   idx=0; score=0; streak=0; categoryStats={};
-  QUESTIONS.forEach(q=>{ categoryStats[q.category] = categoryStats[q.category] || {correct:0,total:0}; });
+  activeQuestions = QUESTIONS.map(shuffleQuestionOptions);
+  activeQuestions.forEach(q=>{ categoryStats[q.category] = categoryStats[q.category] || {correct:0,total:0}; });
   screenStart.classList.add('hidden');
   screenQuiz.classList.remove('hidden');
   loadQuestion();
@@ -491,13 +525,13 @@ function setSiloScale(elm, ratio){
 
 function loadQuestion(){
   clearInterval(timerInt);
-  const q = QUESTIONS[idx];
-  el('qCounter').textContent = `문제 ${idx+1} / ${QUESTIONS.length}`;
+  const q = activeQuestions[idx];
+  el('qCounter').textContent = `문제 ${idx+1} / ${activeQuestions.length}`;
   el('scorePill').textContent = `${score}점`;
   el('catTag').textContent = q.category;
   el('qText').textContent = q.q;
-  el('progressBar').style.width = `${(idx/QUESTIONS.length)*100}%`;
-  setSiloScale(el('siloFillQuiz'), idx/QUESTIONS.length);
+  el('progressBar').style.width = `${(idx/activeQuestions.length)*100}%`;
+  setSiloScale(el('siloFillQuiz'), idx/activeQuestions.length);
 
   const vbox = el('visualBox');
   if(q.type==='chart' && q.visual){
@@ -543,7 +577,7 @@ function loadQuestion(){
 
 function selectAnswer(choice){
   clearInterval(timerInt);
-  const q = QUESTIONS[idx];
+  const q = activeQuestions[idx];
   const buttons = document.querySelectorAll('#optionsBox .opt');
   buttons.forEach(b=>b.disabled=true);
 
@@ -571,7 +605,7 @@ function selectAnswer(choice){
 
 el('nextBtn').addEventListener('click', ()=>{
   idx++;
-  if(idx>=QUESTIONS.length){
+  if(idx>=activeQuestions.length){
     showResult();
   } else {
     loadQuestion();
@@ -584,14 +618,14 @@ async function showResult(){
   el('progressBar').style.width='100%';
   setSiloScale(el('siloFillResult'),1);
 
-  const maxScore = QUESTIONS.length*(100+100+50);
-  const pct = score/maxScore;
+  const maxScore = getMaxPossibleScore(activeQuestions.length);
+  const pct = maxScore ? score/maxScore : 0;
   let grade='새싹 농부', gradeSub='';
   if(pct>=0.85){grade='곡물 메이저 등급';}
   else if(pct>=0.65){grade='숙련된 경작자';}
   else if(pct>=0.4){grade='성장하는 농부';}
   el('resultGrade').textContent = grade;
-  el('resultScore').textContent = `${playerName}님 · 총 ${score}점`;
+  el('resultScore').textContent = `${playerName}님 · 총 ${score}점 / ${maxScore}점`;
 
   await submitScore(playerName, selectedSession, score);
   await loadLeaderboard();
