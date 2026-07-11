@@ -372,7 +372,7 @@ const QUESTIONS = [
       "https://script.google.com/macros/s/xxxxx/exec" 형태의 웹 앱 URL을 붙여넣으세요.
    2) TOP_CLASS / TOP_OVERALL 숫자만 바꾸면 순위판 인원수를 조절할 수 있어요.
 ------------------------------------------------------ */
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrKfdWOzBd6oJXrT0WfbXB7ypiOBke6hkpQue-I3n6e2dQtWkjiuJloSoVNKpAjMDNIQ/exec"; // 여기에 배포한 웹 앱 URL을 넣어주세요
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbze_0eR5KawAkPrKFm3aYSwwkJ_AI4VMxJJeUx-qr8iBYf3uba4rMTa_Lk9pN7XVkeItA/exec";
 const TOP_CLASS = 5;
 const TOP_OVERALL = 10;
 
@@ -578,7 +578,7 @@ el('nextBtn').addEventListener('click', ()=>{
   }
 });
 
-function showResult(){
+async function showResult(){
   screenQuiz.classList.add('hidden');
   screenResult.classList.remove('hidden');
   el('progressBar').style.width='100%';
@@ -593,8 +593,8 @@ function showResult(){
   el('resultGrade').textContent = grade;
   el('resultScore').textContent = `${playerName}님 · 총 ${score}점`;
 
-  submitScore(playerName, selectedSession, score);
-  loadLeaderboard();
+  await submitScore(playerName, selectedSession, score);
+  await loadLeaderboard();
 
   const box = el('breakdownBox');
   box.innerHTML='';
