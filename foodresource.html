@@ -192,6 +192,19 @@
   .lb-time{font-family:var(--mono); font-size:11px; color:var(--cream-dim);}
   .lb-score{font-family:var(--mono); font-weight:700; font-size:14px; color:var(--cream);}
   .lb-status{font-size:12.5px; color:var(--cream-dim); margin-bottom:10px;}
+  .start-actions{display:grid; gap:10px;}
+  .live-head{display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:4px;}
+  .live-indicator{
+    display:inline-flex; align-items:center; gap:7px; flex-shrink:0;
+    font-family:var(--mono); font-size:11px; color:var(--rice);
+    background:rgba(127,176,105,0.10); border:1px solid rgba(127,176,105,0.30);
+    border-radius:20px; padding:6px 10px;
+  }
+  .live-dot{width:7px;height:7px;border-radius:50%;background:var(--rice);box-shadow:0 0 0 0 rgba(127,176,105,.5);animation:livePulse 1.8s infinite;}
+  @keyframes livePulse{70%{box-shadow:0 0 0 7px rgba(127,176,105,0)}100%{box-shadow:0 0 0 0 rgba(127,176,105,0)}}
+  .live-updated{font-family:var(--mono);font-size:11px;color:var(--cream-dim);margin:4px 0 2px;}
+  .live-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;}
+  @media (max-width:420px){.live-actions{grid-template-columns:1fr;}.live-head{flex-direction:column;}}
 </style>
 </head>
 <body>
@@ -230,7 +243,36 @@
     </div>
     <div class="session-hint" id="sessionHint">타임을 먼저 선택해주세요</div>
     <input type="text" class="name-field" id="playerName" placeholder="이름(실명)을 입력하세요" maxlength="12">
-    <button class="btn" id="startBtn">게임 시작 →</button>
+    <div class="start-actions">
+      <button class="btn" id="startBtn">게임 시작 →</button>
+      <button class="btn btn-ghost" id="viewLeaderboardBtn">실시간 스코어보드 보기</button>
+    </div>
+  </div>
+
+  <!-- LIVE LEADERBOARD SCREEN -->
+  <div class="card hidden" id="screen-leaderboard">
+    <div class="live-head">
+      <div>
+        <div class="eyebrow">실시간 스코어보드</div>
+        <h1 id="liveBoardHeading" style="margin-bottom:6px;">A타임 순위</h1>
+        <p class="sub" style="margin-bottom:8px;">게임을 마친 학생들의 점수가 반영되며 5초마다 자동으로 새로고침돼요.</p>
+      </div>
+      <div class="live-indicator"><span class="live-dot"></span>LIVE</div>
+    </div>
+    <div class="live-updated" id="liveUpdatedAt">최신 순위를 불러오는 중...</div>
+
+    <div class="lb-title"><span id="liveLbClassTitleText">A타임 TOP 5</span></div>
+    <div class="lb-status" id="liveLbClassStatus">순위판을 불러오는 중...</div>
+    <div class="lb-list" id="liveLbClassList"></div>
+
+    <div class="lb-title">전체 4개 타임 누적 · TOP 10</div>
+    <div class="lb-status" id="liveLbOverallStatus">순위판을 불러오는 중...</div>
+    <div class="lb-list" id="liveLbOverallList"></div>
+
+    <div class="live-actions">
+      <button class="btn btn-ghost" id="refreshLeaderboardBtn">지금 새로고침</button>
+      <button class="btn" id="backToStartBtn">게임 화면으로 돌아가기</button>
+    </div>
   </div>
 
   <!-- QUIZ SCREEN -->
@@ -401,12 +443,83 @@ function renderLbList(listEl, rows){
   }).join('');
 }
 
-async function loadLeaderboard(){
-  const classStatusEl = el('lbClassStatus');
-  const classListEl = el('lbClassList');
-  const overallStatusEl = el('lbOverallStatus');
-  const overallListEl = el('lbOverallList');
-  el('lbClassTitleText').textContent = `${selectedSession}타임 TOP ${TOP_CLASS}`;
+const RESULT_LEADERBOARD = {
+  classTitle:'lbClassTitleText',
+  classStatus:'lbClassStatus',
+  classList:'lbClassList',
+  overallStatus:'lbOverallStatus',
+  overallList:'lbOverallList'
+};
+
+const LIVE_LEADERBOARD = {
+  classTitle:'liveLbClassTitleText',
+  classStatus:'liveLbClassStatus',
+  classList:'liveLbClassList',
+  overallStatus:'liveLbOverallStatus',
+  overallList:'liveLbOverallList',
+  updatedAt:'liveUpdatedAt'
+};
+
+async function fetchLeaderboardData(includeCurrentPlayer){
+  const params = new URLSearchParams({
+    session: selectedSession,
+    topClass: String(TOP_CLASS),
+    topOverall: String(TOP_OVERALL),
+    _: String(Date.now()) // 브라우저·중간 캐시를 피하고 최신 기록을 요청
+  });
+  if(includeCurrentPlayer){
+    params.set('name', playerName);
+    params.set('score', String(score));
+  }
+
+  const res = await fetch(`${APPS_SCRIPT_URL}?${params.toString()}`, {cache:'no-store'});
+  if(!res.ok) throw new Error(`순위판 요청 실패: ${res.status}`);
+  return res.json();
+}
+
+function renderLeaderboard(target, data){
+  const classStatusEl = el(target.classStatus);
+  const classListEl = el(target.classList);
+  const overallStatusEl = el(target.overallStatus);
+  const overallListEl = el(target.overallList);
+  el(target.classTitle).textContent = `${selectedSession}타임 TOP ${TOP_CLASS}`;
+
+  const classTop = Array.isArray(data.classTop) ? data.classTop : [];
+  const overallTop = Array.isArray(data.overallTop) ? data.overallTop : [];
+
+  if(classTop.length===0){
+    classStatusEl.textContent = `${selectedSession}타임의 기록이 아직 없어요.`;
+    classListEl.innerHTML='';
+  }else{
+    classStatusEl.textContent = `${selectedSession}타임 상위 ${classTop.length}명의 기록이에요`;
+    renderLbList(classListEl, classTop);
+  }
+
+  if(overallTop.length===0){
+    overallStatusEl.textContent = '아직 누적 기록이 없어요.';
+    overallListEl.innerHTML='';
+  }else{
+    overallStatusEl.textContent = `4개 타임을 합친 전체 상위 ${overallTop.length}명이에요`;
+    renderLbList(overallListEl, overallTop);
+  }
+
+  if(target.updatedAt){
+    el(target.updatedAt).textContent = `마지막 갱신 ${new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}`;
+  }
+}
+
+async function loadLeaderboard(target=RESULT_LEADERBOARD, options={}){
+  const {includeCurrentPlayer=false, showLoading=false} = options;
+  const classStatusEl = el(target.classStatus);
+  const classListEl = el(target.classList);
+  const overallStatusEl = el(target.overallStatus);
+  const overallListEl = el(target.overallList);
+  el(target.classTitle).textContent = `${selectedSession}타임 TOP ${TOP_CLASS}`;
+
+  if(showLoading){
+    classStatusEl.textContent = '순위판을 불러오는 중...';
+    overallStatusEl.textContent = '최신 기록을 확인하는 중...';
+  }
 
   if(!APPS_SCRIPT_URL){
     classStatusEl.textContent = '순위판이 아직 연결되지 않았어요. (선생님: APPS_SCRIPT_URL을 설정해주세요)';
@@ -414,38 +527,17 @@ async function loadLeaderboard(){
     classListEl.innerHTML=''; overallListEl.innerHTML='';
     return;
   }
+
   try{
-    const params = new URLSearchParams({
-      session: selectedSession,
-      topClass: String(TOP_CLASS),
-      topOverall: String(TOP_OVERALL),
-      name: playerName,
-      score: String(score)
-    });
-    const res = await fetch(`${APPS_SCRIPT_URL}?${params.toString()}`);
-    const data = await res.json();
-    const classTop = data.classTop || [];
-    const overallTop = data.overallTop || [];
-
-    if(classTop.length===0){
-      classStatusEl.textContent = `${selectedSession}타임의 첫 번째 기록이에요!`;
-      classListEl.innerHTML='';
-    }else{
-      classStatusEl.textContent = `${selectedSession}타임 상위 ${classTop.length}명의 기록이에요`;
-      renderLbList(classListEl, classTop);
-    }
-
-    if(overallTop.length===0){
-      overallStatusEl.textContent = '아직 누적 기록이 없어요.';
-      overallListEl.innerHTML='';
-    }else{
-      overallStatusEl.textContent = `4개 타임을 합친 전체 상위 ${overallTop.length}명이에요`;
-      renderLbList(overallListEl, overallTop);
-    }
+    const data = await fetchLeaderboardData(includeCurrentPlayer);
+    renderLeaderboard(target, data);
   }catch(err){
     classStatusEl.textContent = '순위판을 불러오지 못했어요. 네트워크 상태를 확인해주세요.';
     overallStatusEl.textContent = '';
-    classListEl.innerHTML=''; overallListEl.innerHTML='';
+    if(target.updatedAt) el(target.updatedAt).textContent = '자동 갱신에 실패했어요.';
+    if(showLoading){
+      classListEl.innerHTML=''; overallListEl.innerHTML='';
+    }
     console.warn(err);
   }
 }
@@ -485,9 +577,10 @@ let activeQuestions=[];
 let categoryStats={};
 let playerName="";
 let selectedSession=null;
+let liveLeaderboardTimer=null;
 
 const el = id=>document.getElementById(id);
-const screenStart=el('screen-start'), screenQuiz=el('screen-quiz'), screenResult=el('screen-result');
+const screenStart=el('screen-start'), screenLeaderboard=el('screen-leaderboard'), screenQuiz=el('screen-quiz'), screenResult=el('screen-result');
 
 document.querySelectorAll('.session-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -498,11 +591,48 @@ document.querySelectorAll('.session-btn').forEach(btn=>{
   });
 });
 
+function stopLiveLeaderboard(){
+  if(liveLeaderboardTimer){
+    clearInterval(liveLeaderboardTimer);
+    liveLeaderboardTimer=null;
+  }
+}
+
+function openLiveLeaderboard(){
+  if(!selectedSession){
+    el('sessionHint').classList.add('show');
+    return;
+  }
+  stopLiveLeaderboard();
+  el('liveBoardHeading').textContent = `${selectedSession}타임 순위`;
+  screenStart.classList.add('hidden');
+  screenLeaderboard.classList.remove('hidden');
+  loadLeaderboard(LIVE_LEADERBOARD, {showLoading:true});
+  liveLeaderboardTimer=setInterval(()=>{
+    if(!screenLeaderboard.classList.contains('hidden')){
+      loadLeaderboard(LIVE_LEADERBOARD);
+    }
+  },5000);
+}
+
+el('viewLeaderboardBtn').addEventListener('click', openLiveLeaderboard);
+
+el('refreshLeaderboardBtn').addEventListener('click', ()=>{
+  loadLeaderboard(LIVE_LEADERBOARD, {showLoading:true});
+});
+
+el('backToStartBtn').addEventListener('click', ()=>{
+  stopLiveLeaderboard();
+  screenLeaderboard.classList.add('hidden');
+  screenStart.classList.remove('hidden');
+});
+
 el('startBtn').addEventListener('click', ()=>{
   if(!selectedSession){
     el('sessionHint').classList.add('show');
     return;
   }
+  stopLiveLeaderboard();
   playerName = el('playerName').value.trim() || "학생";
   idx=0; score=0; streak=0; categoryStats={};
   activeQuestions = QUESTIONS.map(shuffleQuestionOptions);
@@ -628,7 +758,7 @@ async function showResult(){
   el('resultScore').textContent = `${playerName}님 · 총 ${score}점 / ${maxScore}점`;
 
   await submitScore(playerName, selectedSession, score);
-  await loadLeaderboard();
+  await loadLeaderboard(RESULT_LEADERBOARD, {includeCurrentPlayer:true, showLoading:true});
 
   const box = el('breakdownBox');
   box.innerHTML='';
